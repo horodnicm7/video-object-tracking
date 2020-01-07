@@ -1,6 +1,6 @@
 import argparse
 
-from src.tracker import Tracker
+from src.supervisor import Supervisor
 
 
 parser = argparse.ArgumentParser(description='Mosse object tracking')
@@ -13,7 +13,7 @@ args = parser.parse_args()
 
 def main():
     port = args.file if args.file else 0
-    tracker = Tracker(port)
+    tracker = Supervisor(port)
     tracker.run()
 
 
