@@ -73,6 +73,11 @@ class Supervisor(object):
 
             # create a copy, as the rectangle drawing function modifies the current frame
             frame_copy = self.current_frame.copy()
+
+            # draw trackers rectangles
+            for tracker in self.trackers:
+                tracker.draw_state(frame_copy)
+
             self.__draw_selection(frame_copy)
             cv2.imshow(self.window_name, frame_copy)
 
