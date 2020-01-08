@@ -24,11 +24,25 @@ class Supervisor(object):
     def __on_select(self, selection):
         self.trackers.append(Mosse(self.gray_frame, selection))
 
+    def __draw_selection(self, frame, line_width=2):
+        if self.rectangle:
+            cv2.rectangle(frame, self.rectangle[:2], self.rectangle[2:], (0, 0, 255), line_width)
+
     def on_mouse_move(self, event, x, y, flags, _):
+        # if the left button is pressed
         if event == cv2.EVENT_LBUTTONDOWN:
             self.start_points = (x, y)
+            self.paused = True
         elif self.start_points:
-            # if it's a click release, then there is a selection
+            # if it's a click release, then there is a selection and we'll continue the video
+            if event == cv2.EVENT_LBUTTONUP:
+                if self.rectangle:
+                    self.__on_select(self.rectangle)
+                self.rectangle = None
+                self.start_points = None
+                self.paused = False
+
+            # if it's a mouse move and the left button is pressed, we expand the selection
             if flags & cv2.EVENT_FLAG_LBUTTON:
                 x0, y0 = [min(x, y) for x, y in zip(self.start_points, (x, y))]
                 x1, y1 = [max(x, y) for x, y in zip(self.start_points, (x, y))]
@@ -36,13 +50,6 @@ class Supervisor(object):
                 # if the selection is larger than a point and not a straight line
                 if x1 > x0 and y1 > y0:
                     self.rectangle = (x0, y0, x1, y1)
-
-                return
-
-            if self.rectangle:
-                self.__on_select(self.rectangle)
-            self.rectangle = None
-            self.start_points = None
 
     def run(self, width=500):
         self.current_frame = self.video.read()[1]
@@ -53,7 +60,6 @@ class Supervisor(object):
         while self.running:
             if not self.paused:
                 frame = self.video.read()[1]
-                self.current_frame = frame
 
                 # end of video
                 if frame is None:
@@ -63,7 +69,12 @@ class Supervisor(object):
                     tracker.update(self.gray_frame)
 
                 frame = imutils.resize(frame, width=width)
-                cv2.imshow(self.window_name, frame)
+                self.current_frame = frame
+
+            # create a copy, as the rectangle drawing function modifies the current frame
+            frame_copy = self.current_frame.copy()
+            self.__draw_selection(frame_copy)
+            cv2.imshow(self.window_name, frame_copy)
 
             key = cv2.waitKey(10)
 
