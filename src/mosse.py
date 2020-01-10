@@ -87,7 +87,7 @@ class Mosse(object):
     def __prepare_convolution_terms(self):
         self.G = cv2.dft(self.g, flags=cv2.DFT_COMPLEX_OUTPUT)
         self.H1 = np.zeros(shape=self.G.shape)
-        self.H2 = np.zeros_like(shape=self.G.shape)
+        self.H2 = np.zeros(shape=self.G.shape)
 
         for _ in range(128):
             a = self.preprocess_frame(Mosse.rnd_warp(self.template))

@@ -76,7 +76,7 @@ class Supervisor(object):
 
             # draw trackers rectangles
             for tracker in self.trackers:
-                tracker.draw_state(frame_copy)
+                tracker.display_selection(frame_copy)
 
             self.__draw_selection(frame_copy)
             cv2.imshow(self.window_name, frame_copy)
