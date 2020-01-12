@@ -68,7 +68,7 @@ class Supervisor(object):
                 for tracker in self.trackers:
                     tracker.update(self.gray_frame)
 
-                frame = imutils.resize(frame, width=width)
+                #frame = imutils.resize(frame, width=width) #modificat
                 self.current_frame = frame
 
             # create a copy, as the rectangle drawing function modifies the current frame

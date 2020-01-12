@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 
-
 class Mosse(object):
     EPS = 1e-5
 
@@ -86,8 +85,10 @@ class Mosse(object):
 
     def __prepare_convolution_terms(self):
         self.G = cv2.dft(self.g, flags=cv2.DFT_COMPLEX_OUTPUT)
-        self.H1 = np.zeros(shape=self.G.shape)
-        self.H2 = np.zeros(shape=self.G.shape)
+        #self.H1 = np.zeros(shape=self.G.shape)
+        #self.H2 = np.zeros(shape=self.G.shape)
+        self.H1 = np.zeros_like(self.G)
+        self.H2 = np.zeros_like(self.G)
 
         for _ in range(128):
             a = self.preprocess_frame(Mosse.rnd_warp(self.template))
@@ -121,7 +122,7 @@ class Mosse(object):
         optimal_left_x = int((left_x + right_x - width) / 2)
         optimal_left_y = int((left_y + right_y - height) / 2)
 
-        self.template_center = (optimal_left_x + 0.5 * width, optimal_left_y + 0.5 * height)
+        self.template_center = (optimal_left_x + 0.5 * (width-1), optimal_left_y + 0.5 * (height-1))
         self.size = (width, height)
 
     def display_selection(self, frame):
