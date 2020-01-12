@@ -14,26 +14,39 @@ class Mosse(object):
         self.update(initial_frame)
 
     @staticmethod
+    def rnd_warp(a):
+        h, w = a.shape[:2]
+        T = np.zeros((2, 3))
+        coef = 0.2
+        ang = (np.random.rand() - 0.5) * coef
+        c, s = np.cos(ang), np.sin(ang)
+        T[:2, :2] = [[c, -s], [s, c]]
+        T[:2, :2] += (np.random.rand(2, 2) - 0.5) * coef
+        c = (w / 2, h / 2)
+        T[:, 2] = c - np.dot(T[:2, :2], c)
+        return cv2.warpAffine(a, T, (w, h), borderMode=cv2.BORDER_REFLECT)
+
+    @staticmethod
     def divSpec(A, B):
         Ar, Ai = A[..., 0], A[..., 1]
         Br, Bi = B[..., 0], B[..., 1]
-        C = (Ar + 1j * Ai) / (Br + 1j * Bi) #equation 10
-        C = np.dstack([np.real(C), np.imag(C)]).copy() #make a list of lists. each list contains [real_part, image_part] of C
+        C = (Ar + 1j * Ai) / (Br + 1j * Bi)
+        C = np.dstack([np.real(C), np.imag(C)]).copy()
         return C
 
     def update_kernel(self):
-        self.H = Mosse.divSpec(self.H1, self.H2) #equation 10
+        self.H = Mosse.divSpec(self.H1, self.H2)
         self.H[..., 1] *= -1
 
     def correlate(self, img):
         C = cv2.mulSpectrums(cv2.dft(img, flags=cv2.DFT_COMPLEX_OUTPUT), self.H, 0, conjB=True)
-        resp = cv2.idft(C, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT) #inverse Discrete Fourier Transform
+        resp = cv2.idft(C, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)
         h, w = resp.shape
-        _, peak_val, _, (mx, my) = cv2.minMaxLoc(resp) #get peak value
+        _, mval, _, (mx, my) = cv2.minMaxLoc(resp)
         side_resp = resp.copy()
-        cv2.rectangle(side_resp, (mx - 5, my - 5), (mx + 5, my + 5), 0, -1) #(image_to_draw_on, start_point, end_point, color, THICCness (-1 = fill the rectangle with color))
-        smean, sstd = side_resp.mean(), side_resp.std() #mean value/standard deviation
-        psr = (peak_val - smean) / (sstd + Mosse.EPS) #peak to sidelobe ratio
+        cv2.rectangle(side_resp, (mx - 5, my - 5), (mx + 5, my + 5), 0, -1)
+        smean, sstd = side_resp.mean(), side_resp.std()
+        psr = (mval - smean) / (sstd + Mosse.EPS)
         return resp, (mx - w // 2, my - h // 2), psr
 
     def update(self, frame, learning_rate=0.125):
@@ -41,7 +54,7 @@ class Mosse(object):
         image = cv2.getRectSubPix(frame, self.size, self.template_center)
         image = self.preprocess_frame(image)
 
-        self.last_resp, (dx, dy), self.psr = self.correlate(image) #last_resp not used
+        self.last_resp, (dx, dy), self.psr = self.correlate(image)
 
         # PSR under 8 means that the object is occluded or tracking has failed
         if self.psr < 8.0:
@@ -52,9 +65,9 @@ class Mosse(object):
         image = cv2.getRectSubPix(frame, self.size, self.template_center)
         image = self.preprocess_frame(image)
 
-        image_dft = cv2.dft(image, flags=cv2.DFT_COMPLEX_OUTPUT) #fourier transformation
-        H1 = cv2.mulSpectrums(self.G, image_dft, 0, conjB=True) #convolution (mulSpectrums: together with dft and idft, it may be used to calculate convolution
-        H2 = cv2.mulSpectrums(image_dft, image_dft, 0, conjB=True) #convolution
+        image_dft = cv2.dft(image, flags=cv2.DFT_COMPLEX_OUTPUT)
+        H1 = cv2.mulSpectrums(self.G, image_dft, 0, conjB=True)
+        H2 = cv2.mulSpectrums(image_dft, image_dft, 0, conjB=True)
 
         self.H1 = H1 * learning_rate + self.H1 * (1.0 - learning_rate)  # equation 11
         self.H2 = H2 * learning_rate + self.H2 * (1.0 - learning_rate)  # equation 12
@@ -72,18 +85,21 @@ class Mosse(object):
 
     def __prepare_convolution_terms(self):
         self.G = cv2.dft(self.g, flags=cv2.DFT_COMPLEX_OUTPUT)
+        #self.H1 = np.zeros(shape=self.G.shape)
+        #self.H2 = np.zeros(shape=self.G.shape)
         self.H1 = np.zeros_like(self.G)
         self.H2 = np.zeros_like(self.G)
 
-        a = self.preprocess_frame(self.template)
+        for _ in range(128):
+            a = self.preprocess_frame(Mosse.rnd_warp(self.template))
 
-        # compute the DFT of the image
-        A = cv2.dft(a, flags=cv2.DFT_COMPLEX_OUTPUT)
+            # compute the DFT of the image
+            A = cv2.dft(a, flags=cv2.DFT_COMPLEX_OUTPUT)
 
-        # get correlation between G and A, without flags
-        self.H1 += cv2.mulSpectrums(self.G, A, 0, conjB=True)
-        # get correlation between A and A, without flags
-        self.H2 += cv2.mulSpectrums(A, A, 0, conjB=True)
+            # get correlation between G and A, without flags
+            self.H1 += cv2.mulSpectrums(self.G, A, 0, conjB=True)
+            # get correlation between A and A, without flags
+            self.H2 += cv2.mulSpectrums(A, A, 0, conjB=True)
 
     def __reduce_image_noise_and_details(self):
         # apply Gaussian Blur on the original image, to reduce noise and the amount of details, for
