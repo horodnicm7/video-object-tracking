@@ -14,7 +14,7 @@ args = parser.parse_args()
 def main():
     port = args.file if args.file else 0
     tracker = Supervisor(port)
-    tracker.run()
+    tracker.run(width=args.width)
 
 
 if __name__ == '__main__':

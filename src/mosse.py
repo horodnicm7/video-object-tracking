@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+
 class Mosse(object):
     EPS = 1e-5
 
@@ -14,26 +15,29 @@ class Mosse(object):
         self.update(initial_frame)
 
     @staticmethod
-    def divSpec(A, B):
+    def div_spec(A, B):
         Ar, Ai = A[..., 0], A[..., 1]
         Br, Bi = B[..., 0], B[..., 1]
-        C = (Ar + 1j * Ai) / (Br + 1j * Bi) #equation 10
-        C = np.dstack([np.real(C), np.imag(C)]).copy() #make a list of lists. each list contains [real_part, image_part] of C
+        C = (Ar + 1j * Ai) / (Br + 1j * Bi)  # equation 10
+        # make a list of lists. each list contains [real_part, image_part] of C
+        C = np.dstack([np.real(C), np.imag(C)]).copy()
         return C
 
     def update_kernel(self):
-        self.H = Mosse.divSpec(self.H1, self.H2) #equation 10
+        self.H = Mosse.div_spec(self.H1, self.H2)  # equation 10
         self.H[..., 1] *= -1
 
     def correlate(self, img):
         C = cv2.mulSpectrums(cv2.dft(img, flags=cv2.DFT_COMPLEX_OUTPUT), self.H, 0, conjB=True)
-        resp = cv2.idft(C, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT) #inverse Discrete Fourier Transform
+        resp = cv2.idft(C, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)  # inverse Discrete Fourier Transform
         h, w = resp.shape
-        _, peak_val, _, (mx, my) = cv2.minMaxLoc(resp) #get peak value
+        _, peak_val, _, (mx, my) = cv2.minMaxLoc(resp)  # get peak value
         side_resp = resp.copy()
-        cv2.rectangle(side_resp, (mx - 5, my - 5), (mx + 5, my + 5), 0, -1) #(image_to_draw_on, start_point, end_point, color, THICCness (-1 = fill the rectangle with color))
-        smean, sstd = side_resp.mean(), side_resp.std() #mean value/standard deviation
-        psr = (peak_val - smean) / (sstd + Mosse.EPS) #peak to sidelobe ratio
+
+        # (image_to_draw_on, start_point, end_point, color, THICCness (-1 = fill the rectangle with color))
+        cv2.rectangle(side_resp, (mx - 5, my - 5), (mx + 5, my + 5), 0, -1)
+        smean, sstd = side_resp.mean(), side_resp.std()  # mean value/standard deviation
+        psr = (peak_val - smean) / (sstd + Mosse.EPS)  # peak to sidelobe ratio
         return resp, (mx - w // 2, my - h // 2), psr
 
     def update(self, frame, learning_rate=0.125):
@@ -41,7 +45,7 @@ class Mosse(object):
         image = cv2.getRectSubPix(frame, self.size, self.template_center)
         image = self.preprocess_frame(image)
 
-        self.last_resp, (dx, dy), self.psr = self.correlate(image) #last_resp not used
+        self.last_resp, (dx, dy), self.psr = self.correlate(image)  # last_resp not used
 
         # PSR under 8 means that the object is occluded or tracking has failed
         if self.psr < 8.0:
@@ -52,9 +56,10 @@ class Mosse(object):
         image = cv2.getRectSubPix(frame, self.size, self.template_center)
         image = self.preprocess_frame(image)
 
-        image_dft = cv2.dft(image, flags=cv2.DFT_COMPLEX_OUTPUT) #fourier transformation
-        H1 = cv2.mulSpectrums(self.G, image_dft, 0, conjB=True) #convolution (mulSpectrums: together with dft and idft, it may be used to calculate convolution
-        H2 = cv2.mulSpectrums(image_dft, image_dft, 0, conjB=True) #convolution
+        image_dft = cv2.dft(image, flags=cv2.DFT_COMPLEX_OUTPUT)  # fourier transformation
+        # convolution (mulSpectrums: together with dft and idft, it may be used to calculate convolution
+        H1 = cv2.mulSpectrums(self.G, image_dft, 0, conjB=True)
+        H2 = cv2.mulSpectrums(image_dft, image_dft, 0, conjB=True)  # convolution
 
         self.H1 = H1 * learning_rate + self.H1 * (1.0 - learning_rate)  # equation 11
         self.H2 = H2 * learning_rate + self.H2 * (1.0 - learning_rate)  # equation 12
@@ -93,7 +98,7 @@ class Mosse(object):
         self.g = cv2.GaussianBlur(self.g, (-1, -1), 2.0)
         self.g /= self.g.max()
 
-        self.hann_window =  cv2.createHanningWindow(self.size, cv2.CV_32F)
+        self.hann_window = cv2.createHanningWindow(self.size, cv2.CV_32F)
 
     def __get_template_info(self, initial_frame, rectangle):
         left_x, left_y, right_x, right_y = rectangle
