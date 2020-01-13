@@ -38,14 +38,14 @@ class Mosse(object):
         cv2.rectangle(side_resp, (mx - 5, my - 5), (mx + 5, my + 5), 0, -1)
         smean, sstd = side_resp.mean(), side_resp.std()  # mean value/standard deviation
         psr = (peak_val - smean) / (sstd + Mosse.EPS)  # peak to sidelobe ratio
-        return resp, (mx - w // 2, my - h // 2), psr
+        return (mx - w // 2, my - h // 2), psr
 
     def update(self, frame, learning_rate=0.125):
         # get the current's frame template and preprocess it
         image = cv2.getRectSubPix(frame, self.size, self.template_center)
         image = self.preprocess_frame(image)
 
-        self.last_resp, (dx, dy), self.psr = self.correlate(image)  # last_resp not used
+        (dx, dy), self.psr = self.correlate(image)
 
         # PSR under 8 means that the object is occluded or tracking has failed
         if self.psr < 8.0:
